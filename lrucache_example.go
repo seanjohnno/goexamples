@@ -3,31 +3,43 @@ package main
 import (
 	"github.com/seanjohnno/memcache"
 	"io/ioutil"
+	"fmt"
+	"net/http"
 )
 
 var (
-	cache = memcache.CreateLRUCache(1024*4)
+	Cache = memcache.CreateLRUCache(1024*4)
+	Resource = "https://raw.githubusercontent.com/seanjohnno/goexamples/master/helloworld.txt"
 )
 
 func main() {
+	fileContent, _ := GetHttpData(Resource)
+	fmt.Println("Content:", string(fileContent))
 
+	fileContent, _ = GetHttpData(Resource)
+	fmt.Println("Content:", string(fileContent))
 }
 
-type FileContent struct {
-	content []byte
+type HttpContent struct {
+	Content []byte
 }
 
-func (this *FileContent) Size() int {
-	return len(content)
+func (this *HttpContent) Size() int {
+	return len(this.Content)
 }
 
-func LoadFile(fileLoc string) []byte, error {
-	if cached, present := cache.Retrieve(); present {
-		return cached.(*FileContent).content, nil
+func GetHttpData(URI string) ([]byte, error) {
+	if cached, present := Cache.Get(URI); present {
+		fmt.Println("Found in cache")
+		return cached.(*HttpContent).Content, nil
 	} else {
-		if fileContent, err := ioutil.ReadFile(fileLoc); err == nil {
-			cache.Add(&FileContent{ content: fileContent})
-		}
-		return fileContent, err
+		fmt.Println("Not found in cache, making network request")
+
+		// No error handling here to make example shorter
+		resp, err := http.Get(URI)
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)		
+		Cache.Add(URI, &HttpContent{ Content: body})
+		return body, err
 	}
 }
